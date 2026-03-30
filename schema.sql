@@ -1,0 +1,51 @@
+CREATE DATABASE IF NOT EXISTS secure_notes
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE secure_notes;
+
+CREATE TABLE IF NOT EXISTS Users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  birth_date DATE DEFAULT NULL,
+  gender VARCHAR(20) DEFAULT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  is_verified TINYINT(1) NOT NULL DEFAULT 0,
+  verification_otp VARCHAR(6) DEFAULT NULL,
+  verification_otp_expires_at DATETIME DEFAULT NULL,
+  reset_otp VARCHAR(6) DEFAULT NULL,
+  reset_otp_expires_at DATETIME DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME DEFAULT NULL,
+  account_deletion_otp VARCHAR(6) DEFAULT NULL,
+  account_deletion_otp_expires_at DATETIME DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Notes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  encrypted_content TEXT NOT NULL,
+  iv VARCHAR(255) NOT NULL,
+  note_password_hash VARCHAR(255) DEFAULT NULL,
+  note_password_salt VARCHAR(255) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at DATETIME DEFAULT NULL,
+  CONSTRAINT fk_notes_user
+    FOREIGN KEY (user_id) REFERENCES Users(id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX idx_notes_user_id ON Notes(user_id);
+CREATE INDEX idx_notes_deleted_at ON Notes(deleted_at);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+  expires INT UNSIGNED NOT NULL,
+  data MEDIUMTEXT COLLATE utf8mb4_bin,
+  PRIMARY KEY (session_id)
+);

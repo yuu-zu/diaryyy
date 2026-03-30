@@ -1,0 +1,243 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sổ nhật ký riêng tư</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="dashboard-page">
+  <header class="dashboard-topbar">
+    <div class="dashboard-brand">
+      <img src="/images/logo-hub.webp" alt="Logo Hub" class="site-logo dashboard-logo">
+    </div>
+    <div class="dashboard-note-label">Secret Diary</div>
+    <div class="dashboard-user-menu">
+      <button id="dashboardUserToggle" class="dashboard-user" type="button">
+        <span id="currentUsername">Người dùng</span>
+      </button>
+      <div id="dashboardUserDropdown" class="dashboard-user-dropdown hidden">
+        <button id="openSettingsBtn" type="button">Cài đặt</button>
+        <button id="switchAccountBtn" type="button">Đổi tài khoản khác</button>
+        <button id="dashboardLogoutBtn" type="button">Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="dashboard-shell">
+    <aside class="dashboard-sidebar">
+      <div class="sidebar-title">Nhật ký</div>
+
+      <div class="sidebar-search">
+        <input id="noteSearchInput" type="search" placeholder="Tìm theo tiêu đề nhật ký...">
+        <button id="noteSearchBtn" class="secondary-btn">Tìm</button>
+      </div>
+
+      <nav class="sidebar-menu">
+        <a href="/" class="sidebar-link sidebar-link-anchor">Trang chủ</a>
+        <button id="showMyNotesBtn" class="sidebar-link active">Trang nhật ký của tôi</button>
+        <button id="showTrashBtn" class="sidebar-link">Thùng rác</button>
+      </nav>
+
+      <section class="sidebar-section">
+        <div class="sidebar-section-head">
+          <button id="toggleSidebarNotesBtn" class="sidebar-toggle-btn hidden" type="button">Xem thêm</button>
+        </div>
+        <ul id="sidebarNotesList" class="sidebar-notes"></ul>
+      </section>
+    </aside>
+
+    <main class="dashboard-main">
+      <section class="dashboard-intro">
+        <h1 id="mainSectionTitle">Trang nhật ký của tôi</h1>
+        <p id="dashboardHint">Chọn một trang để mở riêng, hoặc nhấn dấu cộng để viết thêm một ngày mới.</p>
+      </section>
+
+      <section id="notesGrid" class="notes-grid"></section>
+
+      <section id="noteViewer" class="note-viewer empty">
+        <div class="note-viewer-placeholder">
+          <h2>Chưa mở trang nhật ký nào</h2>
+          <p>Nhấn vào một trang ở menu bên trái hoặc trong lưới để đọc lại nội dung riêng tư của bạn.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <button id="openCreateNoteBtn" class="floating-create-btn" aria-label="Viết trang nhật ký mới">+</button>
+
+  <div id="noteModal" class="note-modal hidden">
+    <div class="note-modal-card">
+      <div class="note-modal-head">
+        <h2 id="noteModalTitle">Viết nhật ký mới</h2>
+        <button id="closeNoteModalBtn" class="icon-btn" type="button">×</button>
+      </div>
+      <form id="noteEditorForm" class="stack-form">
+        <input type="hidden" id="editingNoteId">
+        <input type="text" id="noteTitleInput" placeholder="Tiêu đề cho trang nhật ký" required>
+        <div class="note-editor-toolbar" aria-label="Thanh định dạng">
+          <button type="button" class="toolbar-btn" data-command="bold"><strong>B</strong></button>
+          <button type="button" class="toolbar-btn toolbar-btn-italic" data-command="italic"><em>I</em></button>
+          <button type="button" class="toolbar-btn toolbar-btn-underline" data-command="underline"><span class="toolbar-label toolbar-label-underline">U</span></button>
+          <button type="button" class="toolbar-btn" data-command="justifyLeft" title="Căn trái">Left</button>
+          <button type="button" class="toolbar-btn" data-command="justifyCenter" title="Căn giữa">Center</button>
+          <button type="button" class="toolbar-btn" data-command="justifyRight" title="Căn phải">Right</button>
+          <label class="size-tool" for="noteFontSizeSelect">
+            <span>Cỡ chữ</span>
+            <select id="noteFontSizeSelect">
+              <option value="3">Mặc định</option>
+              <option value="2">Nhỏ</option>
+              <option value="4">Vừa</option>
+              <option value="5">Lớn</option>
+              <option value="6">Rất lớn</option>
+            </select>
+          </label>
+          <label class="color-tool" for="noteTextColorInput">
+            <span>Màu chữ</span>
+            <input type="color" id="noteTextColorInput" value="#213142">
+          </label>
+        </div>
+        <div id="noteContentInput" class="note-editor-surface" contenteditable="true" data-placeholder="Hôm nay của bạn thế nào? Hãy viết lại ở đây..."></div>
+        <section class="note-password-panel">
+          <div>
+            <p class="section-tag">Lớp khóa thứ hai</p>
+            <h3 id="notePasswordPanelTitle">Mật khẩu của trang nhật ký</h3>
+            <p id="notePasswordPanelHint" class="subtle compact-text">Mỗi trang nhật ký mới cần một mật khẩu riêng để mở khóa khi xem.</p>
+          </div>
+          <div class="note-password-grid">
+            <label class="field-stack">
+              <span id="notePasswordInputLabel">Mật khẩu trang nhật ký</span>
+              <input type="password" id="notePasswordInput" placeholder="Nhập mật khẩu để bảo vệ trang này">
+            </label>
+            <label class="field-stack">
+              <span id="notePasswordConfirmLabel">Nhập lại mật khẩu</span>
+              <input type="password" id="notePasswordConfirmInput" placeholder="Nhập lại để xác nhận">
+            </label>
+          </div>
+        </section>
+        <div class="note-modal-actions">
+          <button type="submit">Lưu trang nhật ký</button>
+        </div>
+      </form>
+      <div id="msg" class="status-box"></div>
+    </div>
+  </div>
+
+  <div id="noteViewModal" class="note-modal hidden">
+    <div class="note-modal-card is-viewer">
+      <div class="note-modal-head">
+        <div>
+          <p id="noteViewSectionTag" class="section-tag">Chi tiết trang nhật ký</p>
+          <h2 id="noteViewTitle">Nội dung nhật ký</h2>
+          <p id="noteViewMeta" class="note-meta"></p>
+        </div>
+        <button id="closeNoteViewModalBtn" class="icon-btn" type="button">×</button>
+      </div>
+      <section id="noteUnlockPanel" class="note-unlock-panel hidden">
+        <div class="note-unlock-card">
+          <p class="section-tag">Trang nhật ký đang khóa</p>
+          <h3>Nhập mật khẩu để giải mã nội dung</h3>
+          <p class="subtle compact-text">Dù ai mở được điện thoại và vào web, họ vẫn không đọc được phần này nếu không có đúng mật khẩu trang nhật ký.</p>
+          <label class="field-stack">
+            <span>Mật khẩu trang nhật ký</span>
+            <input type="password" id="noteUnlockPasswordInput" placeholder="Nhập mật khẩu để mở khóa">
+          </label>
+          <div class="note-unlock-actions">
+            <button type="button" id="noteUnlockBtn">Mở khóa nội dung</button>
+          </div>
+        </div>
+      </section>
+      <div id="noteViewContent" class="note-viewer-body note-rendered-content"></div>
+      <div class="note-viewer-actions note-modal-actions note-modal-actions-split">
+        <button type="button" id="noteViewEditBtn">Chỉnh sửa trang này</button>
+        <button type="button" class="danger-btn" id="noteViewTrashBtn">Chuyển vào thùng rác</button>
+      </div>
+      <div id="noteViewMsg" class="status-box"></div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="note-modal hidden">
+    <div class="note-modal-card settings-card">
+      <div class="note-modal-head">
+        <div>
+          <p class="section-tag">Cài đặt tài khoản</p>
+          <h2>Hồ sơ và bảo mật</h2>
+        </div>
+        <button id="closeSettingsModalBtn" class="icon-btn" type="button">×</button>
+      </div>
+
+      <form id="settingsForm" class="stack-form">
+        <label class="field-stack">
+          <span>Tên hiển thị</span>
+          <input type="text" id="settingsFullNameInput" placeholder="Tên hiển thị" required>
+        </label>
+        <label class="field-stack">
+          <span>Username đăng nhập</span>
+          <input type="text" id="settingsUsernameInput" readonly>
+        </label>
+        <label class="field-stack">
+          <span>Email</span>
+          <input type="email" id="settingsEmailInput" readonly>
+        </label>
+        <label class="field-stack">
+          <span>Ngày tháng năm sinh</span>
+          <input type="date" id="settingsBirthDateInput">
+        </label>
+        <label class="field-stack">
+          <span>Giới tính</span>
+          <select id="settingsGenderInput">
+            <option value="">Không chọn</option>
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+            <option value="Khác">Khác</option>
+          </select>
+        </label>
+        <div class="note-modal-actions">
+          <button type="submit">Lưu cài đặt</button>
+        </div>
+      </form>
+
+      <section class="danger-zone">
+        <p class="section-tag">Xóa tài khoản</p>
+        <h3>Xóa mềm trong 30 ngày</h3>
+        <p class="subtle compact-text">Sau khi xác nhận OTP, tài khoản sẽ bị đánh dấu xóa. Nếu bạn không đăng nhập lại trong 30 ngày kể từ lúc xóa, tài khoản sẽ biến mất.</p>
+        <form id="requestDeleteAccountForm" class="stack-form compact-form">
+          <label class="field-stack">
+            <span>Xác nhận xóa tài khoản</span>
+            <select id="deleteAccountConfirmInput" required>
+              <option value="">Chọn</option>
+              <option value="yes">Tôi muốn xóa tài khoản này</option>
+            </select>
+          </label>
+          <label class="field-stack">
+            <span>Nhập mật khẩu tài khoản</span>
+            <input type="password" id="deleteAccountPasswordInput" placeholder="Mật khẩu tài khoản">
+          </label>
+          <div class="note-modal-actions">
+            <button type="submit" class="danger-btn">Gửi OTP xóa tài khoản</button>
+          </div>
+        </form>
+
+        <form id="confirmDeleteAccountForm" class="stack-form compact-form">
+          <label class="field-stack">
+            <span>OTP xóa tài khoản</span>
+            <input type="text" id="deleteAccountOtpInput" placeholder="Nhập OTP vừa nhận qua email" maxlength="6">
+          </label>
+          <div class="note-modal-actions">
+            <button type="submit" class="danger-btn">Xác nhận xóa tài khoản</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="settingsMsg" class="status-box"></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
+
+
+
+
+
