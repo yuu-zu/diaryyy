@@ -1,62 +1,27 @@
-require('dotenv').config();
-
 const admin = require('firebase-admin');
 
-const {
-  FIREBASE_SERVICE_ACCOUNT,
-  FIREBASE_DATABASE_URL
-} = process.env;
-
-function buildCredential() {
-  if (!FIREBASE_SERVICE_ACCOUNT) {
-    throw new Error(
-      'Firebase config missing. Set FIREBASE_SERVICE_ACCOUNT in environment variables.'
-    );
+try {
+  // 1. Kiểm tra xem biến môi trường có tồn tại không để tránh crash app sớm
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    throw new Error("Biến môi trường FIREBASE_SERVICE_ACCOUNT chưa được thiết lập!");
   }
 
-  return JSON.parse(FIREBASE_SERVICE_ACCOUNT);
+  // 2. Parse chuỗi JSON
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+  // 3. Khởi tạo (chỉ khởi tạo nếu chưa có app nào chạy)
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("🔥 Firebase Admin đã kết nối thành công!");
+  }
+} catch (error) {
+  console.error("❌ Lỗi cấu hình Firebase:", error.message);
+  // Trong môi trường production, bạn có thể muốn xử lý lỗi này kỹ hơn
 }
 
-const serviceAccount = buildCredential();
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id || serviceAccount.projectId,
-    databaseURL: FIREBASE_DATABASE_URL || 'https://diary-uuu-default-rtdb.firebaseio.com/'
-  });
-}
-
-const db = admin.database();
-
-async function nextId(sequenceName) {
-  const counterRef = db.ref(`_meta/counters/${sequenceName}`);
-  return counterRef.transaction((current) => {
-    const value = typeof current === 'number' ? current : 0;
-    return value + 1;
-  }).then((result) => {
-    if (!result.committed) {
-      throw new Error(`Failed to increment counter for ${sequenceName}`);
-    }
-    return result.snapshot.val();
-  });
-}
-
-function collection(name) {
-  return db.ref(name);
-}
-
-function asDateString(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-}
-
-module.exports = {
-  admin,
-  asDateString,
-  collection,
-  db,
-  nextId
-};
+// 4. Xuất database để các file khác sử dụng
+// Lưu ý: Đổi .firestore() thành .database() nếu bạn dùng Realtime DB
+const db = admin.firestore(); 
+module.exports = db;
