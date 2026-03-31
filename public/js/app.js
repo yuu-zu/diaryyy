@@ -91,6 +91,9 @@ if (document.getElementById('loginForm')) {
     });
     setMessage(data.message, !response.ok);
     if (response.ok) {
+      if (window.setAuthToken && data.token) {
+        window.setAuthToken(data.token);
+      }
       setTimeout(() => {
         location.href = '/dashboard.html';
       }, 1000);
@@ -138,6 +141,9 @@ if (document.getElementById('resetForm')) {
 
 function logout(redirectTo = '/login.html') {
   fetch('/auth/logout', { method: 'POST' }).then(() => {
+    if (window.clearAuthToken) {
+      window.clearAuthToken();
+    }
     location.href = redirectTo;
   });
 }
@@ -588,6 +594,14 @@ if (document.body.classList.contains('dashboard-page')) {
     if (response.ok) {
       state.currentUser = data.user;
       usernameEl.textContent = data.user.full_name || data.user.username;
+      return;
+    }
+
+    if (response.status === 401) {
+      if (window.clearAuthToken) {
+        window.clearAuthToken();
+      }
+      location.href = '/login.html';
     }
   }
 

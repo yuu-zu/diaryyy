@@ -66,30 +66,31 @@ function decryptStoredNote(note, notePassword, userId) {
 router.get('/', async (req, res) => {
   await purgeExpiredTrash();
   const query = String(req.query.q || '').trim();
+  const userId = req.user.id;
 
   if (query) {
-    const notes = await searchNotesByTitle(req.session.userId, query);
+    const notes = await searchNotesByTitle(userId, query);
     return res.json(notes);
   }
 
-  const notes = await getNotesByUser(req.session.userId);
+  const notes = await getNotesByUser(userId);
   res.json(notes);
 });
 
 router.get('/recent/list', async (req, res) => {
   await purgeExpiredTrash();
-  const notes = await getRecentNotesByUser(req.session.userId, 5);
+  const notes = await getRecentNotesByUser(req.user.id, 5);
   res.json(notes);
 });
 
 router.get('/trash/list', async (req, res) => {
   await purgeExpiredTrash();
-  const notes = await getTrashByUser(req.session.userId);
+  const notes = await getTrashByUser(req.user.id);
   res.json(notes);
 });
 
 router.get('/:id', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId, true);
+  const note = await getNoteById(req.params.id, req.user.id, true);
   if (!note) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº.' });
   }
@@ -102,7 +103,7 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/:id/unlock', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId, true);
+  const note = await getNoteById(req.params.id, req.user.id, true);
   if (!note) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº.' });
   }
@@ -118,7 +119,7 @@ router.post('/:id/unlock', async (req, res) => {
   }
 
   try {
-    const content = decryptStoredNote(note, notePassword, req.session.userId);
+    const content = decryptStoredNote(note, notePassword, req.user.id);
     res.json({
       ...buildNoteResponse(note),
       content
@@ -137,12 +138,12 @@ router.post('/', async (req, res) => {
 
   const notePasswordHash = await bcrypt.hash(notePassword, 12);
   const { encrypted, iv, salt } = encryptProtectedNote(content, notePassword);
-  await createNote(req.session.userId, title, encrypted, iv, notePasswordHash, salt);
+  await createNote(req.user.id, title, encrypted, iv, notePasswordHash, salt);
   res.json({ message: 'Táº¡o ghi chÃº thÃ nh cÃ´ng.' });
 });
 
 router.put('/:id', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId);
+  const note = await getNoteById(req.params.id, req.user.id);
   if (!note) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº Ä‘á»ƒ cáº­p nháº­t.' });
   }
@@ -176,38 +177,38 @@ router.put('/:id', async (req, res) => {
     return res.json({ message: 'Cáº­p nháº­t thÃ nh cÃ´ng. Ghi chÃº Ä‘Ã£ Ä‘Æ°á»£c báº­t khÃ³a máº­t kháº©u.' });
   }
 
-  const { encrypted, iv } = encryptLegacyNote(content, req.session.userId);
+  const { encrypted, iv } = encryptLegacyNote(content, req.user.id);
   await updateNote(req.params.id, title, encrypted, iv, null, null);
   res.json({ message: 'Cáº­p nháº­t thÃ nh cÃ´ng.' });
 });
 
 router.delete('/:id', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId);
+  const note = await getNoteById(req.params.id, req.user.id);
   if (!note) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº Ä‘á»ƒ xÃ³a.' });
   }
 
-  await moveNoteToTrash(req.params.id, req.session.userId);
+  await moveNoteToTrash(req.params.id, req.user.id);
   res.json({ message: 'ÄÃ£ chuyá»ƒn ghi chÃº vÃ o thÃ¹ng rÃ¡c. Ghi chÃº sáº½ Ä‘Æ°á»£c giá»¯ trong 30 ngÃ y.' });
 });
 
 router.post('/:id/restore', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId, true);
+  const note = await getNoteById(req.params.id, req.user.id, true);
   if (!note || !note.deleted_at) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº trong thÃ¹ng rÃ¡c.' });
   }
 
-  await restoreNote(req.params.id, req.session.userId);
+  await restoreNote(req.params.id, req.user.id);
   res.json({ message: 'ÄÃ£ khÃ´i phá»¥c ghi chÃº.' });
 });
 
 router.delete('/:id/permanent', async (req, res) => {
-  const note = await getNoteById(req.params.id, req.session.userId, true);
+  const note = await getNoteById(req.params.id, req.user.id, true);
   if (!note || !note.deleted_at) {
     return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº trong thÃ¹ng rÃ¡c.' });
   }
 
-  await permanentlyDeleteNote(req.params.id, req.session.userId);
+  await permanentlyDeleteNote(req.params.id, req.user.id);
   res.json({ message: 'ÄÃ£ xÃ³a vÄ©nh viá»…n ghi chÃº.' });
 });
 

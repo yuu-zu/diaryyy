@@ -1,18 +1,12 @@
-// Main server file for Secure Notes App
 require('dotenv').config();
 
-const express = require('express');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const path = require('path');
-const authRoutes = require('./routes/auth');
-const notesRoutes = require('./routes/notes');
 const https = require('https');
 const fs = require('fs');
+const path = require('path');
+const app = require('./app');
 const { ensureNoteSecurityColumns } = require('./models/note');
 const { ensureUserProfileColumns } = require('./models/user');
 
-const app = express();
 const port = Number(process.env.PORT || 3001);
 const certDir = path.join(__dirname, 'cert');
 const keyPath = path.join(certDir, 'key.pem');
@@ -27,24 +21,6 @@ const httpsOptions = useHttps
       cert: fs.readFileSync(certPath)
     }
   : null;
-
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_secret_key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: useHttps }
-}));
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.use('/auth', authRoutes);
-app.use('/notes', notesRoutes);
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 async function startServer() {
   await ensureUserProfileColumns();
@@ -61,7 +37,7 @@ async function startServer() {
   }
 }
 
-startServer().catch(error => {
+startServer().catch((error) => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });

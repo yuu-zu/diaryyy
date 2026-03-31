@@ -11,11 +11,12 @@
 ## Da thay doi gi
 - Bo MySQL.
 - Du lieu user va ghi chu duoc luu tren Firebase Realtime Database.
-- Session dang dung `express-session` local de app chay duoc ngay tren may nay.
+- Dang nhap da chuyen sang JWT stateless hop voi Vercel.
+- API co the duoc rewrite qua serverless functions trong thu muc `api/`.
 
 ## Cach cau hinh Firebase
 1. Mo Firebase Console va tao project.
-2. Bat `Firestore Database`.
+2. Bat `Realtime Database`.
 3. Vao `Project settings` > `Service accounts`.
 4. Bam `Generate new private key`.
 5. Luu file JSON thanh:
@@ -36,7 +37,8 @@ npm start
 ```
 
 ## Bien moi truong
-- `SESSION_SECRET`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
 - `MAIL_FROM`
 - `MAIL_ALLOW_CONSOLE_FALLBACK=true|false`
@@ -48,3 +50,4 @@ npm start
 - Backend se khong khoi dong neu chua co Firebase service account hop le.
 - File `.env` dang bi ignore, va `serviceAccountKey.json` cung da duoc ignore de tranh lo key.
 - Neu Gmail app password sai, dat `MAIL_ALLOW_CONSOLE_FALLBACK=true` de app van tiep tuc va in OTP ra terminal khi test local.
+- Khi deploy Vercel, nho them day du env vars trong project settings va khong push file service account that.
