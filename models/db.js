@@ -1,40 +1,20 @@
 require('dotenv').config();
 
-const fs = require('fs');
-const path = require('path');
 const admin = require('firebase-admin');
 
 const {
-  FIREBASE_SERVICE_ACCOUNT_PATH,
-  FIREBASE_PROJECT_ID,
-  FIREBASE_CLIENT_EMAIL,
-  FIREBASE_PRIVATE_KEY,
+  FIREBASE_SERVICE_ACCOUNT,
   FIREBASE_DATABASE_URL
 } = process.env;
 
 function buildCredential() {
-  if (FIREBASE_SERVICE_ACCOUNT_PATH) {
-    const resolvedPath = path.resolve(process.cwd(), FIREBASE_SERVICE_ACCOUNT_PATH);
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(
-        `Firebase service account file not found at ${resolvedPath}. Download it from Firebase Console > Project settings > Service accounts.`
-      );
-    }
-
-    return JSON.parse(fs.readFileSync(resolvedPath, 'utf8'));
+  if (!FIREBASE_SERVICE_ACCOUNT) {
+    throw new Error(
+      'Firebase config missing. Set FIREBASE_SERVICE_ACCOUNT in environment variables.'
+    );
   }
 
-  if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
-    return {
-      projectId: FIREBASE_PROJECT_ID,
-      clientEmail: FIREBASE_CLIENT_EMAIL,
-      privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    };
-  }
-
-  throw new Error(
-    'Firebase config missing. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.'
-  );
+  return JSON.parse(FIREBASE_SERVICE_ACCOUNT);
 }
 
 const serviceAccount = buildCredential();
@@ -42,7 +22,7 @@ const serviceAccount = buildCredential();
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.projectId || FIREBASE_PROJECT_ID,
+    projectId: serviceAccount.project_id || serviceAccount.projectId,
     databaseURL: FIREBASE_DATABASE_URL || 'https://diary-uuu-default-rtdb.firebaseio.com/'
   });
 }
