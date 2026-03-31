@@ -1,159 +1,197 @@
-const db = require('./db');
+const { collection, nextId } = require('./db');
 
-async function ensureColumn(columnName, definition, backfillSql = null) {
-  const [columns] = await db.query(
-    `SELECT COLUMN_NAME
-     FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Users' AND COLUMN_NAME = ?`,
-    [columnName]
-  );
+const USERS = 'users';
 
-  if (!columns.length) {
-    await db.query(`ALTER TABLE Users ADD COLUMN ${columnName} ${definition}`);
-    if (backfillSql) {
-      await db.query(backfillSql);
-    }
-  }
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizeUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    full_name: user.full_name || '',
+    username: user.username,
+    email: user.email,
+    password_hash: user.password_hash,
+    is_verified: Boolean(user.is_verified),
+    verification_otp: user.verification_otp || null,
+    verification_otp_expires_at: user.verification_otp_expires_at || null,
+    reset_otp: user.reset_otp || null,
+    reset_otp_expires_at: user.reset_otp_expires_at || null,
+    birth_date: user.birth_date || null,
+    gender: user.gender || null,
+    created_at: user.created_at || nowIso(),
+    updated_at: user.updated_at || user.created_at || nowIso(),
+    deleted_at: user.deleted_at || null,
+    account_deletion_otp: user.account_deletion_otp || null,
+    account_deletion_otp_expires_at: user.account_deletion_otp_expires_at || null
+  };
+}
+
+async function listUsers() {
+  const snapshot = await collection(USERS).once('value');
+  const data = snapshot.val() || {};
+  return Object.values(data)
+    .map((item) => normalizeUser(item))
+    .sort((a, b) => a.id - b.id);
+}
+
+async function getUserDoc(id) {
+  const snapshot = await collection(USERS).child(String(id)).once('value');
+  return snapshot.exists() ? normalizeUser(snapshot.val()) : null;
+}
+
+async function saveUser(id, patch) {
+  const ref = collection(USERS).child(String(id));
+  const existing = await ref.once('value');
+  if (!existing.exists()) return null;
+
+  const next = {
+    ...existing.val(),
+    ...patch,
+    updated_at: nowIso()
+  };
+  await ref.set(next);
+  return normalizeUser(next);
 }
 
 async function ensureUserProfileColumns() {
-  await ensureColumn('full_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER id", "UPDATE Users SET full_name = username WHERE full_name = '' OR full_name IS NULL");
-  await ensureColumn('birth_date', 'DATE NULL AFTER email');
-  await ensureColumn('gender', 'VARCHAR(20) NULL AFTER birth_date');
-  await ensureColumn('deleted_at', 'DATETIME NULL AFTER updated_at');
-  await ensureColumn('account_deletion_otp', 'VARCHAR(6) NULL AFTER deleted_at');
-  await ensureColumn('account_deletion_otp_expires_at', 'DATETIME NULL AFTER account_deletion_otp');
+  return true;
 }
 
 async function createUser(fullName, username, email, passwordHash, verificationOtp, verificationOtpExpiresAt) {
-  await db.query(
-    `INSERT INTO Users (
-      full_name,
-      username,
-      email,
-      password_hash,
-      is_verified,
-      verification_otp,
-      verification_otp_expires_at,
-      created_at
-    ) VALUES (?, ?, ?, ?, 0, ?, ?, NOW())`,
-    [fullName, username, email, passwordHash, verificationOtp, verificationOtpExpiresAt]
-  );
+  const id = await nextId(USERS);
+  const payload = normalizeUser({
+    id,
+    full_name: fullName,
+    username,
+    email,
+    password_hash: passwordHash,
+    is_verified: false,
+    verification_otp: verificationOtp,
+    verification_otp_expires_at: new Date(verificationOtpExpiresAt).toISOString(),
+    created_at: nowIso(),
+    updated_at: nowIso()
+  });
+
+  await collection(USERS).child(String(id)).set(payload);
+  return payload;
 }
 
 async function findUserByUsername(username) {
-  const [rows] = await db.query('SELECT * FROM Users WHERE username = ?', [username]);
-  return rows[0];
+  const users = await listUsers();
+  return users.find((user) => user.username === username) || null;
 }
 
 async function findUserByIdentifier(identifier) {
-  const [rows] = await db.query(
-    'SELECT * FROM Users WHERE username = ? OR email = ?',
-    [identifier, identifier]
-  );
-  return rows[0];
+  const users = await listUsers();
+  return users.find((user) => user.username === identifier || user.email === identifier) || null;
 }
 
 async function findUserById(id) {
-  const [rows] = await db.query(
-    `SELECT id, full_name, username, email, birth_date, gender, is_verified, created_at, deleted_at
-     FROM Users WHERE id = ?`,
-    [id]
-  );
-  return rows[0];
+  const user = await getUserDoc(id);
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    full_name: user.full_name,
+    username: user.username,
+    email: user.email,
+    birth_date: user.birth_date,
+    gender: user.gender,
+    is_verified: user.is_verified,
+    created_at: user.created_at,
+    deleted_at: user.deleted_at
+  };
 }
 
 async function findUserByEmail(email) {
-  const [rows] = await db.query('SELECT * FROM Users WHERE email = ?', [email]);
-  return rows[0];
+  const users = await listUsers();
+  return users.find((user) => user.email === email) || null;
 }
 
 async function setVerificationOtp(userId, otp, expiresAt) {
-  await db.query(
-    'UPDATE Users SET verification_otp = ?, verification_otp_expires_at = ?, is_verified = 0 WHERE id = ?',
-    [otp, expiresAt, userId]
-  );
+  await saveUser(userId, {
+    verification_otp: otp,
+    verification_otp_expires_at: new Date(expiresAt).toISOString(),
+    is_verified: false
+  });
 }
 
 async function updateUserVerification(userId, isVerified) {
-  await db.query(
-    'UPDATE Users SET is_verified = ?, verification_otp = NULL, verification_otp_expires_at = NULL WHERE id = ?',
-    [isVerified, userId]
-  );
+  await saveUser(userId, {
+    is_verified: isVerified,
+    verification_otp: null,
+    verification_otp_expires_at: null
+  });
 }
 
 async function setResetOtp(userId, otp, expiresAt) {
-  await db.query(
-    'UPDATE Users SET reset_otp = ?, reset_otp_expires_at = ? WHERE id = ?',
-    [otp, expiresAt, userId]
-  );
+  await saveUser(userId, {
+    reset_otp: otp,
+    reset_otp_expires_at: new Date(expiresAt).toISOString()
+  });
 }
 
 async function clearResetOtp(userId) {
-  await db.query(
-    'UPDATE Users SET reset_otp = NULL, reset_otp_expires_at = NULL WHERE id = ?',
-    [userId]
-  );
+  await saveUser(userId, {
+    reset_otp: null,
+    reset_otp_expires_at: null
+  });
 }
 
 async function updateUserPassword(userId, passwordHash) {
-  await db.query(
-    'UPDATE Users SET password_hash = ?, reset_otp = NULL, reset_otp_expires_at = NULL WHERE id = ?',
-    [passwordHash, userId]
-  );
+  await saveUser(userId, {
+    password_hash: passwordHash,
+    reset_otp: null,
+    reset_otp_expires_at: null
+  });
 }
 
 async function updateUserProfile(userId, fullName, birthDate, gender) {
-  await db.query(
-    `UPDATE Users
-     SET full_name = ?, birth_date = ?, gender = ?
-     WHERE id = ?`,
-    [fullName, birthDate || null, gender || null, userId]
-  );
+  await saveUser(userId, {
+    full_name: fullName,
+    birth_date: birthDate || null,
+    gender: gender || null
+  });
 }
 
 async function setAccountDeletionOtp(userId, otp, expiresAt) {
-  await db.query(
-    `UPDATE Users
-     SET account_deletion_otp = ?, account_deletion_otp_expires_at = ?
-     WHERE id = ?`,
-    [otp, expiresAt, userId]
-  );
+  await saveUser(userId, {
+    account_deletion_otp: otp,
+    account_deletion_otp_expires_at: new Date(expiresAt).toISOString()
+  });
 }
 
 async function clearAccountDeletionOtp(userId) {
-  await db.query(
-    `UPDATE Users
-     SET account_deletion_otp = NULL, account_deletion_otp_expires_at = NULL
-     WHERE id = ?`,
-    [userId]
-  );
+  await saveUser(userId, {
+    account_deletion_otp: null,
+    account_deletion_otp_expires_at: null
+  });
 }
 
 async function scheduleAccountDeletion(userId) {
-  await db.query(
-    `UPDATE Users
-     SET deleted_at = NOW(), account_deletion_otp = NULL, account_deletion_otp_expires_at = NULL
-     WHERE id = ?`,
-    [userId]
-  );
+  await saveUser(userId, {
+    deleted_at: nowIso(),
+    account_deletion_otp: null,
+    account_deletion_otp_expires_at: null
+  });
 }
 
 async function restoreDeletedAccount(userId) {
-  await db.query(
-    `UPDATE Users
-     SET deleted_at = NULL, account_deletion_otp = NULL, account_deletion_otp_expires_at = NULL
-     WHERE id = ?`,
-    [userId]
-  );
+  await saveUser(userId, {
+    deleted_at: null,
+    account_deletion_otp: null,
+    account_deletion_otp_expires_at: null
+  });
 }
 
 async function purgeExpiredDeletedUsers() {
-  await db.query(
-    `DELETE FROM Users
-     WHERE deleted_at IS NOT NULL
-       AND deleted_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
-  );
+  const users = await listUsers();
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const expired = users.filter((user) => user.deleted_at && new Date(user.deleted_at).getTime() < cutoff);
+  await Promise.all(expired.map((user) => collection(USERS).child(String(user.id)).remove()));
 }
 
 module.exports = {

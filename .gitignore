@@ -1,6 +1,10 @@
 node_modules/
 .env
+serviceAccountKey.json
+diary-uuu-firebase-adminsdk-fbsvc-80812726d0.json
 cert/
+server.log
+server.err.log
 
 # Common build output
 dist/

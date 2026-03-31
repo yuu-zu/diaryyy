@@ -1,35 +1,50 @@
 # Secure Notes App
 
-## Chức năng hiện có
-- Đăng ký bằng username, email và password
-- Gửi OTP qua Gmail để xác thực tài khoản
-- Gửi lại OTP xác thực khi cần
-- Đăng nhập bằng username hoặc email sau khi đã xác thực
-- Quên mật khẩu, gửi OTP về email và đổi mật khẩu mới
-- Tạo, xem, sửa, xóa ghi chú đã mã hóa AES-256-GCM
+## Chuc nang hien co
+- Dang ky bang username, email va password
+- Gui OTP qua Gmail de xac thuc tai khoan
+- Dang nhap bang username hoac email
+- Quen mat khau, gui OTP va dat lai mat khau
+- Tao, xem, sua, xoa ghi chu da ma hoa AES-256-GCM
+- Ho tro thung rac 30 ngay va khoi phuc tai khoan
 
-## Cấu hình cần thiết
-1. Tạo database bằng file `schema.sql`
-2. Tạo file `.env` từ mẫu `.env.example`
-3. Điền đúng thông tin MySQL và Gmail app password
-4. Nếu muốn chạy HTTPS, đặt `cert/key.pem` và `cert/cert.pem`
+## Da thay doi gi
+- Bo MySQL.
+- Du lieu user va ghi chu duoc luu tren Firebase Realtime Database.
+- Session dang dung `express-session` local de app chay duoc ngay tren may nay.
 
-## Cài đặt
+## Cach cau hinh Firebase
+1. Mo Firebase Console va tao project.
+2. Bat `Firestore Database`.
+3. Vao `Project settings` > `Service accounts`.
+4. Bam `Generate new private key`.
+5. Luu file JSON thanh:
+   - `C:\Users\ngan\Pictures\vs code\less2\serviceAccountKey.json`
+6. Trong `.env`, de:
+   - `FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json`
+   - `FIREBASE_DATABASE_URL=https://diary-uuu-default-rtdb.firebaseio.com/`
+
+Ban cung co the dung 3 bien:
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
+## Cai dat
 ```bash
 npm install
 npm start
 ```
 
-## Biến môi trường
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+## Bien moi truong
 - `SESSION_SECRET`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`
 - `MAIL_FROM`
+- `MAIL_ALLOW_CONSOLE_FALLBACK=true|false`
 - `USE_HTTPS=true|false`
+- `FIREBASE_SERVICE_ACCOUNT_PATH` hoac 3 bien Firebase
+- `FIREBASE_DATABASE_URL`
 
-## Luồng sử dụng
-1. Mở `register.html` để tạo tài khoản và nhận OTP qua email
-2. Mở `verify.html` để xác thực OTP
-3. Đăng nhập tại `login.html`
-4. Nếu quên mật khẩu, vào `forgot.html` để xin OTP reset
-5. Mở `reset.html` để đặt lại mật khẩu
+## Luu y
+- Backend se khong khoi dong neu chua co Firebase service account hop le.
+- File `.env` dang bi ignore, va `serviceAccountKey.json` cung da duoc ignore de tranh lo key.
+- Neu Gmail app password sai, dat `MAIL_ALLOW_CONSOLE_FALLBACK=true` de app van tiep tuc va in OTP ra terminal khi test local.

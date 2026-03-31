@@ -20,14 +20,27 @@ function createTransporter() {
 }
 
 async function sendMail({ to, subject, html, text }) {
-  const transporter = createTransporter();
-  await transporter.sendMail({
-    from: process.env.MAIL_FROM || process.env.SMTP_USER,
-    to,
-    subject,
-    text,
-    html
-  });
+  const allowConsoleFallback = String(process.env.MAIL_ALLOW_CONSOLE_FALLBACK || 'false').toLowerCase() === 'true';
+
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM || process.env.SMTP_USER,
+      to,
+      subject,
+      text,
+      html
+    });
+  } catch (error) {
+    if (!allowConsoleFallback) {
+      throw error;
+    }
+
+    console.warn('SMTP failed, using console fallback instead.');
+    console.warn(`TO: ${to}`);
+    console.warn(`SUBJECT: ${subject}`);
+    console.warn(`TEXT: ${text}`);
+  }
 }
 
 module.exports = { sendMail };

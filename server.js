@@ -3,7 +3,6 @@ require('dotenv').config();
 
 const express = require('express');
 const session = require('express-session');
-const MySQLStore = require('express-mysql-session')(session);
 const bodyParser = require('body-parser');
 const path = require('path');
 const authRoutes = require('./routes/auth');
@@ -29,22 +28,12 @@ const httpsOptions = useHttps
     }
   : null;
 
-// MySQL session store config
-const sessionStore = new MySQLStore({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'secure_notes'
-});
-
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your_secret_key',
   resave: false,
   saveUninitialized: false,
-  store: sessionStore,
   cookie: { secure: useHttps }
 }));
 

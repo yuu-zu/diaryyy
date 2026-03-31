@@ -1,137 +1,144 @@
-const db = require('./db');
+const { collection, nextId } = require('./db');
+
+const NOTES = 'notes';
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizeNote(note) {
+  if (!note) return null;
+  return {
+    id: note.id,
+    user_id: note.user_id,
+    title: note.title,
+    encrypted_content: note.encrypted_content,
+    iv: note.iv,
+    note_password_hash: note.note_password_hash || null,
+    note_password_salt: note.note_password_salt || null,
+    created_at: note.created_at || nowIso(),
+    updated_at: note.updated_at || note.created_at || nowIso(),
+    deleted_at: note.deleted_at || null
+  };
+}
+
+async function listNotes() {
+  const snapshot = await collection(NOTES).once('value');
+  const data = snapshot.val() || {};
+  return Object.values(data)
+    .map((item) => normalizeNote(item))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+async function getNoteDoc(id) {
+  const snapshot = await collection(NOTES).child(String(id)).once('value');
+  return snapshot.exists() ? normalizeNote(snapshot.val()) : null;
+}
+
+async function saveNote(id, patch) {
+  const ref = collection(NOTES).child(String(id));
+  const existing = await ref.once('value');
+  if (!existing.exists()) return null;
+
+  const next = {
+    ...existing.val(),
+    ...patch,
+    updated_at: nowIso()
+  };
+  await ref.set(next);
+  return normalizeNote(next);
+}
 
 async function createNote(userId, title, encryptedContent, iv, notePasswordHash = null, notePasswordSalt = null) {
-  await db.query(
-    `INSERT INTO Notes (
-      user_id,
-      title,
-      encrypted_content,
-      iv,
-      note_password_hash,
-      note_password_salt,
-      created_at,
-      updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [userId, title, encryptedContent, iv, notePasswordHash, notePasswordSalt]
-  );
+  const id = await nextId(NOTES);
+  const payload = normalizeNote({
+    id,
+    user_id: Number(userId),
+    title,
+    encrypted_content: encryptedContent,
+    iv,
+    note_password_hash: notePasswordHash,
+    note_password_salt: notePasswordSalt,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+    deleted_at: null
+  });
+
+  await collection(NOTES).child(String(id)).set(payload);
+  return payload;
 }
 
 async function getNotesByUser(userId) {
-  const [rows] = await db.query(
-    `SELECT id, title, created_at, updated_at
-     FROM Notes
-     WHERE user_id = ? AND deleted_at IS NULL
-     ORDER BY created_at DESC`,
-    [userId]
-  );
-  return rows;
+  const notes = await listNotes();
+  return notes.filter((note) => note.user_id === Number(userId) && !note.deleted_at);
 }
 
 async function getRecentNotesByUser(userId, limit = 5) {
-  const [rows] = await db.query(
-    `SELECT id, title, created_at, updated_at
-     FROM Notes
-     WHERE user_id = ? AND deleted_at IS NULL
-     ORDER BY created_at DESC
-     LIMIT ?`,
-    [userId, Number(limit)]
-  );
-  return rows;
+  const notes = await getNotesByUser(userId);
+  return notes.slice(0, Number(limit));
 }
 
 async function searchNotesByTitle(userId, query) {
-  const [rows] = await db.query(
-    `SELECT id, title, created_at, updated_at
-     FROM Notes
-     WHERE user_id = ? AND deleted_at IS NULL AND title LIKE ?
-     ORDER BY created_at DESC`,
-    [userId, `%${query}%`]
-  );
-  return rows;
+  const notes = await getNotesByUser(userId);
+  const keyword = String(query || '').toLowerCase();
+  return notes.filter((note) => String(note.title || '').toLowerCase().includes(keyword));
 }
 
 async function getTrashByUser(userId) {
-  const [rows] = await db.query(
-    `SELECT id, title, created_at, deleted_at
-     FROM Notes
-     WHERE user_id = ? AND deleted_at IS NOT NULL
-       AND deleted_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-     ORDER BY deleted_at DESC`,
-    [userId]
-  );
-  return rows;
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const notes = await listNotes();
+  return notes.filter((note) => {
+    if (note.user_id !== Number(userId) || !note.deleted_at) return false;
+    return new Date(note.deleted_at).getTime() >= cutoff;
+  });
 }
 
 async function getNoteById(id, userId, includeDeleted = false) {
-  const deletedCondition = includeDeleted ? '' : 'AND deleted_at IS NULL';
-  const [rows] = await db.query(
-    `SELECT * FROM Notes WHERE id = ? AND user_id = ? ${deletedCondition}`,
-    [id, userId]
-  );
-  return rows[0];
+  const note = await getNoteDoc(id);
+  if (!note || note.user_id !== Number(userId)) return null;
+  if (!includeDeleted && note.deleted_at) return null;
+  return note;
 }
 
 async function updateNote(id, title, encryptedContent, iv, notePasswordHash = null, notePasswordSalt = null) {
-  await db.query(
-    `UPDATE Notes
-     SET title = ?,
-         encrypted_content = ?,
-         iv = ?,
-         note_password_hash = ?,
-         note_password_salt = ?,
-         updated_at = NOW()
-     WHERE id = ?`,
-    [title, encryptedContent, iv, notePasswordHash, notePasswordSalt, id]
-  );
+  await saveNote(id, {
+    title,
+    encrypted_content: encryptedContent,
+    iv,
+    note_password_hash: notePasswordHash,
+    note_password_salt: notePasswordSalt
+  });
 }
 
 async function moveNoteToTrash(id, userId) {
-  await db.query(
-    'UPDATE Notes SET deleted_at = NOW() WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
-    [id, userId]
-  );
+  const note = await getNoteById(id, userId);
+  if (!note) return;
+  await saveNote(id, { deleted_at: nowIso() });
 }
 
 async function restoreNote(id, userId) {
-  await db.query(
-    `UPDATE Notes
-     SET deleted_at = NULL, updated_at = NOW()
-     WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL
-       AND deleted_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
-    [id, userId]
-  );
+  const note = await getNoteById(id, userId, true);
+  if (!note || !note.deleted_at) return;
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  if (new Date(note.deleted_at).getTime() < cutoff) return;
+  await saveNote(id, { deleted_at: null });
 }
 
 async function permanentlyDeleteNote(id, userId) {
-  await db.query(
-    'DELETE FROM Notes WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL',
-    [id, userId]
-  );
+  const note = await getNoteById(id, userId, true);
+  if (!note || !note.deleted_at) return;
+  await collection(NOTES).child(String(id)).remove();
 }
 
 async function purgeExpiredTrash() {
-  await db.query(
-    'DELETE FROM Notes WHERE deleted_at IS NOT NULL AND deleted_at < DATE_SUB(NOW(), INTERVAL 30 DAY)'
-  );
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const notes = await listNotes();
+  const expired = notes.filter((note) => note.deleted_at && new Date(note.deleted_at).getTime() < cutoff);
+  await Promise.all(expired.map((note) => collection(NOTES).child(String(note.id)).remove()));
 }
 
 async function ensureNoteSecurityColumns() {
-  const [columns] = await db.query(
-    `SELECT COLUMN_NAME
-     FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Notes'
-       AND COLUMN_NAME IN ('note_password_hash', 'note_password_salt')`
-  );
-
-  const existingColumns = new Set(columns.map(column => column.COLUMN_NAME));
-
-  if (!existingColumns.has('note_password_hash')) {
-    await db.query('ALTER TABLE Notes ADD COLUMN note_password_hash VARCHAR(255) NULL AFTER iv');
-  }
-
-  if (!existingColumns.has('note_password_salt')) {
-    await db.query('ALTER TABLE Notes ADD COLUMN note_password_salt VARCHAR(255) NULL AFTER note_password_hash');
-  }
+  return true;
 }
 
 module.exports = {
