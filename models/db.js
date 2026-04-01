@@ -5,7 +5,7 @@ let db;
 
 try {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    throw new Error("Biến môi trường FIREBASE_SERVICE_ACCOUNT chưa được thiết lập!");
+    throw new Error('Bien moi truong FIREBASE_SERVICE_ACCOUNT chua duoc thiet lap!');
   }
 
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -13,33 +13,32 @@ try {
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      // Tự động lấy URL nếu bạn có khai báo, nếu không Firestore sẽ tự nhận diện qua Project ID
-      databaseURL: process.env.FIREBASE_DATABASE_URL 
+      databaseURL: process.env.FIREBASE_DATABASE_URL
     });
-    console.log("🔥 Firebase Admin đã kết nối thành công!");
+    console.log('Firebase Admin da ket noi thanh cong!');
   }
-  
-  // Gán db là Firestore vì lỗi trước đó của bạn liên quan đến Firestore
-  db = admin.firestore(); 
 
+  db = admin.database();
 } catch (error) {
-  console.error("❌ Lỗi cấu hình Firebase:", error.message);
+  console.error('Loi cau hinh Firebase:', error.message);
 }
 
-// Hàm bổ trợ để tương thích với file models/user.js và các file khác
 function collection(name) {
-  if (!db) throw new Error("Database chưa khởi tạo thành công!");
-  return db.collection(name);
+  if (!db) throw new Error('Database chua khoi tao thanh cong!');
+  return db.ref(name);
 }
 
-// Hàm tạo ID tự tăng (dùng cho Firestore)
 async function nextId(sequenceName) {
-  const counterRef = db.collection('_meta').doc('counters');
-  return db.runTransaction(async (transaction) => {
-    const doc = await transaction.get(counterRef);
-    const newVal = (doc.exists ? (doc.data()[sequenceName] || 0) : 0) + 1;
-    transaction.set(counterRef, { [sequenceName]: newVal }, { merge: true });
-    return newVal;
+  const counterRef = db.ref(`_meta/counters/${sequenceName}`);
+  return new Promise((resolve, reject) => {
+    counterRef.transaction(
+      (currentValue) => (Number(currentValue) || 0) + 1,
+      (error, committed, snapshot) => {
+        if (error) return reject(error);
+        if (!committed) return reject(new Error(`Khong the tao sequence cho ${sequenceName}`));
+        resolve(snapshot.val());
+      }
+    );
   });
 }
 
@@ -49,7 +48,6 @@ function asDateString(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-// QUAN TRỌNG: Phải export đầy đủ các hàm mà các file khác đang gọi
 module.exports = {
   admin,
   db,
